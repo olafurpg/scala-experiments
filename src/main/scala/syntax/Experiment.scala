@@ -64,10 +64,8 @@ object Experiment {
         case _ =>
       }
       val newBindings: Seq[String] = tree match {
-        case HasTypeParams(tparams) =>
-          tparams.collect {
-            case t: Type.Param => t.name.syntax
-          }
+        case HasTypeParams(tparams) => tparams
+        case HasTypeStats(tparams) => tparams
         case _ => Nil
       }
       val newGamma = gamma ++ newBindings
@@ -105,15 +103,29 @@ object Experiment {
   }
 }
 
-object ScalaMetaError {
-  def unapply(arg: ScalaMetaError): Option[] =
-}
-
-object HasTypeParams {
-  def unapply(arg: Tree): Option[Seq[Type.Param]] = arg match {
-    case t: Defn.Def => Some(t.tparams)
-    case t: Defn.Trait => Some(t.tparams)
-    case t: Defn.Class => Some(t.tparams)
-    case _ => None
+object HasTypeStats {
+  def unapply(arg: Tree): Option[Seq[String]] = {
+    val stats: Option[Seq[Stat]] = arg match {
+      case t: Template if t.stats.nonEmpty => Some(t.stats.get)
+      case t: Term.Block => Some(t.stats)
+      case _ => None
+    }
+    stats.map(_.collect {
+      case t: Decl.Type => t.name.syntax
+      case t: Defn.Type => t.name.syntax
+    })
   }
+
+}
+object HasTypeParams {
+  def unapply(arg: Tree): Option[Seq[String]] = {
+    val res = arg match {
+      case t: Defn.Def => Some(t.tparams)
+      case t: Defn.Trait => Some(t.tparams)
+      case t: Defn.Class => Some(t.tparams)
+      case _ => None
+    }
+    res.map(_.map(_.name.syntax))
+  }
+
 }
