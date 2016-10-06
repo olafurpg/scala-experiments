@@ -3,20 +3,25 @@ package syntax
 import scala.collection.immutable
 
 import java.io.File
+import java.nio.file.Paths
 
 case class ScalaFile(filename: String, projectUrl: String, commit: String) {
+
+  def jFile = new File(FileOps.getFile("target", "repos", repo), filename)
 
   def rawUrl = {
     val raw = projectUrl.replace("github.com", "raw.githubusercontent.com")
     s"$raw/$commit$filename"
   }
 
+
+
   def read: String = {
-    val toRead = new File(FileOps.getFile("target", "repos", repo), filename)
-    FileOps.readFile(toRead)
+    FileOps.readFile(jFile)
   }
 
   def githubUrl = s"$projectUrl/blob/$commit$filename"
+  def githubUrlAtLine(line: Int): String = s"$githubUrl#L$line"
   def userRepo = projectUrl.stripPrefix("https://github.com/")
   def repo = userRepo.split("/")(1)
   def user = userRepo.split("/")(0)

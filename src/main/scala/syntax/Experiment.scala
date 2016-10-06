@@ -15,52 +15,105 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 
 object Experiment {
-  def runAnalysis[T: ClassTag](
-      analysis: PartialFunction[Tree, T]): mutable.Buffer[T] = {
-    val results = new CopyOnWriteArrayList[T]
+
+  def collectAnalysis[T](analysis: PartialFunction[Tree, T]): Tree => Seq[T] = {
+    ast =>
+      ast.collect(analysis)
+  }
+
+  def runAnalysis[T: ClassTag](size: Int)(
+      analysis: Tree => Seq[T]): mutable.Buffer[(ScalaFile, T)] = {
+    val results = new CopyOnWriteArrayList[(ScalaFile, T)]
     val counter = new AtomicInteger()
-    ScalaFile.getAll.toVector.par.foreach { file =>
+    val errors = new AtomicInteger()
+    ScalaFile.getAll.take(size).toVector.par.foreach { file =>
       val n = counter.incrementAndGet()
       if (n % 1000 == 0) {
         println(n)
       }
       try {
-        file.read.parse[Source] match {
+        file.jFile.parse[Source] match {
           case Parsed.Success(ast) =>
-            ast.collect(analysis).foreach { t =>
-              results.add(t)
+            analysis(ast).foreach { t =>
+              results.add(file -> t)
             }
           case _ =>
         }
       } catch {
+        case e: org.scalameta.invariants.InvariantFailedException => // scala.meta error
+        case e: java.nio.charset.MalformedInputException => // scala.meta error
+        case e: java.util.NoSuchElementException => // scala.meta error
         case NonFatal(e) =>
+          e.printStackTrace()
+          println(e.getClass.getSimpleName)
+          val i = errors.incrementAndGet()
+          if (i > 100) {
+            ???
+          }
       }
     }
     results.asScala
   }
 
-  type x = {
-    val y: Int
+  def projectAnalysis: Tree => Seq[Type.Project] = { ast =>
+    val builder = Seq.newBuilder[Type.Project]
+    def loop(tree: Tree)(gamma: Set[String]): Unit = {
+      tree match {
+        case t: Type.Project if gamma.contains(t.qual.syntax) =>
+          builder += t
+        case _ =>
+      }
+      val newBindings: Seq[String] = tree match {
+        case HasTypeParams(tparams) =>
+          tparams.collect {
+            case t: Type.Param => t.name.syntax
+          }
+        case _ => Nil
+      }
+      val newGamma = gamma ++ newBindings
+      tree.children.foreach(loop(_)(newGamma))
+    }
+    loop(ast)(Set.empty[String])
+    builder.result()
+  }
+
+  def runTypeCompounds(): Unit = {
+    val compounds = runAnalysis(30000)(collectAnalysis {
+      case t: Type.Compound =>
+        t.refinement
+    })
+    compounds.groupBy(_.getClass.getSimpleName).mapValues(_.length).foreach {
+      case (k, v) =>
+        println(s"$k: $v")
+    }
+  }
+
+  def runTypeProjections(): Unit = {
+    val typProjections = runAnalysis(100000)(projectAnalysis)
+    typProjections.foreach {
+      case (file, t) =>
+        val url = file.githubUrlAtLine(
+          t.tokens.headOption.map(_.pos.start.line).getOrElse(0))
+        println(s"$url ${t.syntax}")
+    }
+    println("typProjectsions: " + typProjections.length)
   }
 
   def main(args: Array[String]): Unit = {
     println("Experiment!!!")
-    val compounds = runAnalysis[Type.Compound] {
-      case t: Type.Compound => t
-    }
-    val vals = new DescriptiveStatistics()
-    val defs = new DescriptiveStatistics()
-    val types = new DescriptiveStatistics()
-    compounds.foreach { x =>
-      x.refinement.foreach {
-        case _: Decl.Def => defs.addValue(1.0)
-        case _: Decl.Val => vals.addValue(1.0)
-        case _: Decl.Type => types.addValue(1.0)
-      }
-    }
-    println(compounds.length)
-    println("vals: " + vals.getSum)
-    println("defs: " + defs.getSum)
-    println("types: " + types.getSum)
+    runTypeProjections()
+  }
+}
+
+object ScalaMetaError {
+  def unapply(arg: ScalaMetaError): Option[] =
+}
+
+object HasTypeParams {
+  def unapply(arg: Tree): Option[Seq[Type.Param]] = arg match {
+    case t: Defn.Def => Some(t.tparams)
+    case t: Defn.Trait => Some(t.tparams)
+    case t: Defn.Class => Some(t.tparams)
+    case _ => None
   }
 }
