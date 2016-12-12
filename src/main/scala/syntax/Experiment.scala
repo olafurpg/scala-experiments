@@ -155,7 +155,7 @@ object Experiment {
     def isSymbolic(nme: String) =
       !nme.exists(x => Character.isLetterOrDigit(x))
 
-    val infixOwners = runAnalysis[InfixExperiment](1000) { t =>
+    val infixOwners = runAnalysis[InfixExperiment](10000000) { t =>
       val owners = getOwners(t)
 
       def isCandidate(ft: FormatToken, tok: Token): Boolean =
@@ -177,7 +177,8 @@ object Experiment {
 //      case (a, b) => println(s"$a: $b")
 //    }
     val (start, end) = infixOwners.partition(_._2.startOfLine)
-    println(prettyPrint(start))
+//    println(prettyPrint(start))
+    start.map(_._2).groupBy(_.getClass.getName).mapValues(_.length).foreach(println)
     println("SOL: " + start.length)
     println("SOL infix: " + start.count(_._2.ownerName.contains("ApplyInfix")))
     println("EOL infix: " + end.count(_._2.ownerName.contains("ApplyInfix")))
