@@ -179,14 +179,20 @@ object Experiment {
     val (start, end) = infixOwners.partition(_._2.startOfLine)
 //    println(prettyPrint(start))
     start
-      .map(_._2)
-      .groupBy(_.ownerName)
-      .mapValues(_.length)
+      .groupBy(_._2.ownerName)
+      .mapValues(x => x -> x.length)
       .toSeq
-      .sortBy(_._2)
+      .sortBy(_._2._1)
       .foreach {
-        case (a, b) =>
+        case (a, (c, b)) =>
           println(s"$a: $b")
+          c.foreach {
+            case (x, y) =>
+              if (y.ownerName.endsWith("Apply") ||
+                  y.ownerName.contains("Unary")) {
+                println(x.githubUrlAtLine(linenumber(y.owner)))
+              }
+          }
       }
     println("SOL: " + start.length)
     println("SOL infix: " + start.count(_._2.ownerName.contains("ApplyInfix")))
