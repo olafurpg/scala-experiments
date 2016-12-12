@@ -155,7 +155,7 @@ object Experiment {
     def isSymbolic(nme: String) =
       !nme.exists(x => Character.isLetterOrDigit(x))
 
-    val infixOwners = runAnalysis[InfixExperiment](100000) { t =>
+    val infixOwners = runAnalysis[InfixExperiment](100) { t =>
       val owners = getOwners(t)
 
       def isCandidate(ft: FormatToken, tok: Token): Boolean =
@@ -182,7 +182,7 @@ object Experiment {
       .groupBy(_._2.ownerName)
       .mapValues(x => x -> x.length)
       .toSeq
-      .sortBy(_._2._1)
+      .sortBy(_._2._1.length)
       .foreach {
         case (a, (c, b)) =>
           println(s"$a: $b")
