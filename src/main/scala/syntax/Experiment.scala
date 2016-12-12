@@ -155,15 +155,16 @@ object Experiment {
     def isSymbolic(nme: String) =
       !nme.exists(x => Character.isLetterOrDigit(x))
 
-    val infixOwners = runAnalysis[InfixExperiment](100) { t =>
+    val infixOwners = runAnalysis[InfixExperiment](100000) { t =>
       val owners = getOwners(t)
+      val statementsStarts = getStatementStarts(t).keys.toSet
 
       def isCandidate(ft: FormatToken, tok: Token): Boolean =
         ft.newlines > 0 &&
           isSymbolic(tok.syntax) &&
           !owners(tok).parent.exists(_.is[Pat])
       val fts = FormatToken.formatTokens(t.tokens)
-      fts.collect {
+      val result = fts.collect {
         // lines ending in infix operator
         case ft @ FormatToken(tok: Token.Ident, _, _)
             if isCandidate(ft, tok) =>
@@ -172,12 +173,14 @@ object Experiment {
             if isCandidate(ft, tok) =>
           InfixExperiment(tok, owners(tok), startOfLine = true)
       }
+      result.filter(x => statementsStarts(x.tok))
     }
 //    infixOwners.groupBy(_._2.getClass.getName).mapValues(_.length).foreach {
 //      case (a, b) => println(s"$a: $b")
 //    }
     val (start, end) = infixOwners.partition(_._2.startOfLine)
 //    println(prettyPrint(start))
+    var questions = 0
     start
       .groupBy(_._2.ownerName)
       .mapValues(x => x -> x.length)
@@ -188,12 +191,14 @@ object Experiment {
           println(s"$a: $b")
           c.foreach {
             case (x, y) =>
-              if (y.ownerName.endsWith("Apply") ||
-                  y.ownerName.contains("Unary")) {
-                println(x.githubUrlAtLine(linenumber(y.owner)))
-              }
+              println(x.githubUrlAtLine(linenumber(y.owner)))
+              if (y.tok.syntax == "???") questions += 1
+//              if (y.ownerName.endsWith("Apply") ||
+//                  y.ownerName.contains("Unary")) {
+//              }
           }
       }
+    println("???: " + questions)
     println("SOL: " + start.length)
     println("SOL infix: " + start.count(_._2.ownerName.contains("ApplyInfix")))
     println("EOL infix: " + end.count(_._2.ownerName.contains("ApplyInfix")))
@@ -206,6 +211,94 @@ object Experiment {
 //    runTypeProjections()
 //    runTypeCompounds()
   }
+
+
+
+  def getStatementStarts(tree: Tree): Map[Token, Tree] = {
+    import Token._
+    import scala.reflect.classTag
+    import scala.reflect.ClassTag
+    def getEnumStatements(enums: Seq[Enumerator]): Seq[Enumerator] = {
+      val ret = Seq.newBuilder[Enumerator]
+      enums.zipWithIndex.foreach {
+        case (x, 0) => x
+        case (enum: Enumerator.Guard, i) =>
+          // Only guard that follows another guards starts a statement.
+          if (enums(i - 1).is[Enumerator.Guard]) {
+            ret += enum
+          }
+        case (x, _) => ret += x
+      }
+      ret.result()
+    }
+
+    def extractStatementsIfAny(tree: Tree): Seq[Tree] = tree match {
+      case b: Term.Block => b.stats
+      case t: Pkg => t.stats
+      // TODO(olafur) would be nice to have an abstract "For" superclass.
+      case t: Term.For => getEnumStatements(t.enums)
+      case t: Term.ForYield => getEnumStatements(t.enums)
+      case t: Term.Match => t.cases
+      case t: Term.PartialFunction => t.cases
+      case t: Term.TryWithCases => t.catchp
+      case t: Type.Compound => t.refinement
+      case t: scala.meta.Source => t.stats
+      case t: Template if t.stats.isDefined => t.stats.get
+      case t: Case if t.body.tokens.nonEmpty => Seq(t.body)
+      case _ => Seq.empty[Tree]
+    }
+
+
+    val ret = Map.newBuilder[Token, Tree]
+    ret.sizeHint(tree.tokens.length)
+
+    def addAll(trees: Seq[Tree]): Unit = {
+      trees.foreach { t =>
+        ret += t.tokens.head -> t
+      }
+    }
+
+    def addDefn[T: ClassTag](mods: Seq[Mod], tree: Tree): Unit = {
+      // Each @annotation gets a separate line
+      val annotations = mods.filter(_.is[Mod.Annot])
+      addAll(annotations)
+      val firstNonAnnotation: Token = mods.collectFirst {
+        case x if !x.is[Mod.Annot] =>
+          // Non-annotation modifier, for example `sealed`/`abstract`
+          x.tokens.head
+      }.getOrElse {
+        // No non-annotation modifier exists, fallback to keyword like `object`
+        tree.tokens.find(x => classTag[T].runtimeClass.isInstance(x)) match {
+          case Some(x) => x
+          case None => ???
+        }
+      }
+      ret += firstNonAnnotation -> tree
+    }
+
+    def loop(x: Tree): Unit = {
+      x match {
+        case t: Defn.Class => addDefn[KwClass](t.mods, t)
+        case t: Defn.Def => addDefn[KwDef](t.mods, t)
+        case t: Decl.Def => addDefn[KwDef](t.mods, t)
+        case t: Ctor.Secondary => addDefn[KwDef](t.mods, t)
+        case t: Defn.Object => addDefn[KwObject](t.mods, t)
+        case t: Defn.Trait => addDefn[KwTrait](t.mods, t)
+        case t: Defn.Type => addDefn[KwType](t.mods, t)
+        case t: Decl.Type => addDefn[KwType](t.mods, t)
+        case t: Defn.Val => addDefn[KwVal](t.mods, t)
+        case t: Decl.Val => addDefn[KwVal](t.mods, t)
+        case t: Defn.Var => addDefn[KwVar](t.mods, t)
+        case t: Decl.Var => addDefn[KwVar](t.mods, t)
+        case t => // Nothing
+          addAll(extractStatementsIfAny(t))
+      }
+      x.children.foreach(loop)
+    }
+    loop(tree)
+    ret.result()
+  }
+
 }
 
 object HasTypeStats {
