@@ -71,7 +71,7 @@ object TreeOps {
     ret.sizeHint(tree.tokens.length)
 
     def addAll(trees: Seq[Tree]): Unit = {
-      trees.foreach { t =>
+      trees.drop(1).dropRight(1).foreach { t =>
         ret += t.tokens.head -> t
       }
     }
