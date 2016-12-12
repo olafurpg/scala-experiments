@@ -13,10 +13,16 @@ import scala.util.control.NonFatal
 
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+
 trait Show[T] {
   def print(e: T): String
   def lineNumber(e: T): Int
+  def pretty(file: ScalaFile, t: T): String = {
+    val url = file.githubUrlAtLine(this.lineNumber(t))
+    s"$url: ${this.print(t)}"
+  }
 }
+
 object Show {
   implicit def treeShow[T <: Tree]: Show[T] = new Show[T] {
     override def print(e: T): String = e.syntax
@@ -39,18 +45,8 @@ object Show {
 
 object Experiment {
 
-  // two statements
-  List(1)
-  map(_ +)
-
-  // one statement
-  1
-  + 2
-
-  def collectAnalysis[T](analysis: PartialFunction[Tree, T]): Tree => Seq[T] = {
-    ast =>
-      ast.collect(analysis)
-  }
+  def collectAnalysis[T](analysis: PartialFunction[Tree, T]): Tree => Seq[T] =
+    _.collect(analysis)
 
   def runAnalysis[T: ClassTag](size: Int)(
       analysis: Tree => Seq[T]): mutable.Buffer[(ScalaFile, T)] = {
@@ -111,11 +107,7 @@ object Experiment {
 
   def prettyPrint[T](buf: Traversable[(ScalaFile, T)])(
       implicit ev: Show[T]): String = {
-    buf.map {
-      case (file, t) =>
-        val url = file.githubUrlAtLine(ev.lineNumber(t))
-        s"$url: ${ev.print(t)}"
-    }.mkString("\n")
+    buf.map((ev.pretty _).tupled).mkString("\n")
   }
 
   def runTypeCompounds(): Unit = {
@@ -163,7 +155,7 @@ object Experiment {
     def isSymbolic(nme: String) =
       !nme.exists(x => Character.isLetterOrDigit(x))
 
-    val infixOwners = runAnalysis[InfixExperiment](100000) { t =>
+    val infixOwners = runAnalysis[InfixExperiment](500) { t =>
       val owners = getOwners(t)
       val statementsStarts = getStatementStarts(t).keys.toSet
 
@@ -183,12 +175,7 @@ object Experiment {
       }
       result.filter(x => statementsStarts(x.tok))
     }
-//    infixOwners.groupBy(_._2.getClass.getName).mapValues(_.length).foreach {
-//      case (a, b) => println(s"$a: $b")
-//    }
     val (start, end) = infixOwners.partition(_._2.startOfLine)
-//    println(prettyPrint(start))
-    var questions = 0
     start
       .groupBy(_._2.ownerName)
       .mapValues(x => x -> x.length)
@@ -199,14 +186,9 @@ object Experiment {
           println(s"$a: $b")
           c.foreach {
             case (x, y) =>
-              println(x.githubUrlAtLine(linenumber(y.owner)))
-              if (y.tok.syntax == "???") questions += 1
-//              if (y.ownerName.endsWith("Apply") ||
-//                  y.ownerName.contains("Unary")) {
-//              }
+              println(InfixExperiment.infixExperimentShow.pretty(x, y))
           }
       }
-    println("???: " + questions)
     println("SOL: " + start.length)
     println("SOL infix: " + start.count(_._2.ownerName.contains("ApplyInfix")))
     println("EOL infix: " + end.count(_._2.ownerName.contains("ApplyInfix")))
@@ -393,7 +375,7 @@ case class InfixExperiment(tok: Token, owner: Tree, startOfLine: Boolean) {
 object InfixExperiment {
   implicit val infixExperimentShow: Show[InfixExperiment] =
     Show.instance[InfixExperiment](
-      x => s"${x.tok.syntax}: ${x.ownerName}",
+      x => s"${x.tok.syntax}", // : ${x.ownerName}",
       x => Experiment.linenumber(x.owner)
     )
 }
