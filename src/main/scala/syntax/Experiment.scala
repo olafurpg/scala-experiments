@@ -39,6 +39,14 @@ object Show {
 
 object Experiment {
 
+  // two statements
+  List(1)
+  map(_ +)
+
+  // one statement
+  1
+  + 2
+
   def collectAnalysis[T](analysis: PartialFunction[Tree, T]): Tree => Seq[T] = {
     ast =>
       ast.collect(analysis)
@@ -212,8 +220,6 @@ object Experiment {
 //    runTypeCompounds()
   }
 
-
-
   def getStatementStarts(tree: Tree): Map[Token, Tree] = {
     import Token._
     import scala.reflect.classTag
@@ -247,7 +253,6 @@ object Experiment {
       case t: Case if t.body.tokens.nonEmpty => Seq(t.body)
       case _ => Seq.empty[Tree]
     }
-
 
     val ret = Map.newBuilder[Token, Tree]
     ret.sizeHint(tree.tokens.length)
