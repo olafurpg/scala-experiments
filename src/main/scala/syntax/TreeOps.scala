@@ -56,23 +56,23 @@ object TreeOps {
     case _ => Seq.empty[Tree]
   }
 
-  def getDequeueSpots(tree: Tree): Set[TokenHash] = {
-    val ret = Set.newBuilder[TokenHash]
+  def getDequeueSpots(tree: Tree): Set[Token] = {
+    val ret = Set.newBuilder[Token]
     tree.tokens.foreach {
       case t @ KwElse() =>
-        ret += hash(t)
+        ret += t
       case _ =>
     }
     ret.result()
   }
 
-  def getStatementStarts(tree: Tree): Map[TokenHash, Tree] = {
-    val ret = Map.newBuilder[TokenHash, Tree]
+  def getStatementStarts(tree: Tree): Map[Token, Tree] = {
+    val ret = Map.newBuilder[Token, Tree]
     ret.sizeHint(tree.tokens.length)
 
     def addAll(trees: Seq[Tree]): Unit = {
       trees.foreach { t =>
-        ret += hash(t.tokens.head) -> t
+        ret += t.tokens.head -> t
       }
     }
 
@@ -91,7 +91,7 @@ object TreeOps {
           case None => ???
         }
       }
-      ret += hash(firstNonAnnotation) -> tree
+      ret += firstNonAnnotation -> tree
     }
 
     def loop(x: Tree): Unit = {
@@ -122,8 +122,8 @@ object TreeOps {
     *
     * Contains lookup keys in both directions, opening [({ and closing })].
     */
-  def getMatchingParentheses(tokens: Tokens): Map[TokenHash, Token] = {
-    val ret = Map.newBuilder[TokenHash, Token]
+  def getMatchingParentheses(tokens: Tokens): Map[Token, Token] = {
+    val ret = Map.newBuilder[Token, Token]
     var stack = List.empty[Token]
     tokens.foreach {
       case open @ (LeftBrace() | LeftBracket() | LeftParen() |
@@ -133,8 +133,8 @@ object TreeOps {
           Interpolation.End()) =>
         val open = stack.head
         assertValidParens(open, close)
-        ret += hash(open) -> close
-        ret += hash(close) -> open
+        ret += open -> close
+        ret += close -> open
         stack = stack.tail
       case _ =>
     }
@@ -156,11 +156,11 @@ object TreeOps {
   /**
     * Creates lookup table from token offset to its closest scala.meta tree.
     */
-  def getOwners(tree: Tree): Map[TokenHash, Tree] = {
-    val result = Map.newBuilder[TokenHash, Tree]
+  def getOwners(tree: Tree): Map[Token, Tree] = {
+    val result = Map.newBuilder[Token, Tree]
     def loop(x: Tree): Unit = {
       x.tokens.foreach { tok =>
-        result += hash(tok) -> x
+        result += tok -> x
       }
       x.children.foreach(loop)
     }
@@ -176,8 +176,8 @@ object TreeOps {
     })
   }
 
-  def childOf(tok: Token, tree: Tree, owners: Map[TokenHash, Tree]): Boolean =
-    childOf(owners(hash(tok)), tree)
+  def childOf(tok: Token, tree: Tree, owners: Map[Token, Tree]): Boolean =
+    childOf(owners(tok), tree)
 
   @tailrec
   final def parents(tree: Tree,

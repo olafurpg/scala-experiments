@@ -14,6 +14,9 @@ import scala.util.control.NonFatal
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
+object TypeCompoundExperiment {
+
+}
 object Experiment {
 
   def collectAnalysis[T](analysis: PartialFunction[Tree, T]): Tree => Seq[T] =
