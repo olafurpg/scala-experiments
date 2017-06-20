@@ -1,7 +1,5 @@
 name := "syntax-experiments"
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.2"
 
-libraryDependencies += "org.scalameta" %% "scalameta" % "1.1.0"
-
-libraryDependencies += "org.apache.commons" % "commons-math3" % "3.6"
+libraryDependencies += "org.scalameta" %% "testkit" % "1.8.0"
