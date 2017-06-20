@@ -8,7 +8,7 @@ import testkit._
 object Experiment {
 
   def symbolicInfix(corpus: Corpus): String = {
-    val files = Corpus.files(corpus).take(1000).toBuffer.par
+    val files = Corpus.files(corpus).toBuffer.par
     val results =
       SyntaxAnalysis.onParsed[Observation[String]](files) { source =>
         source.collect {
