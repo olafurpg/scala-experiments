@@ -9,26 +9,21 @@ object Experiment {
 
   def symbolicInfix(corpus: Corpus): String = {
     val files = Corpus.files(corpus).toBuffer.par
-    val results = SyntaxAnalysis.onParsed[Observation[Term.Name]](files) {
-      source =>
+    val results =
+      SyntaxAnalysis.onParsed[Observation[Term.Name]](files) { source =>
         source.collect {
-          case Term.Name("foobaraaaaaaaaaaaaaaaaaaaaaaaaaaa") =>
-            'aaaaaaaa
+          case Term.ApplyInfix(_, name, _, args) if args.length > 1 =>
+            Observation("infix call site with multiple args",
+                        name.pos.start.line,
+                        name)
+          case Defn.Def(_, name, _, Seq(params), _, _)
+              if !name.value.forall(_.isLetterOrDigit) &&
+                params.length > 1 =>
+            Observation("symbolic def with multi args",
+                        name.pos.start.line,
+                        name)
         }
-//          case Term.ApplyInfix(_, name, _, args) if args.length > 1 =>
-//            Observation("infix call site with multiple args",
-//                        name.pos.start.line,
-//                        name)
-//          case Defn.Def(_, name, _, Seq(params), _, _)
-//              if !name.value.forall(_.isLetterOrDigit) &&
-//                params.length > 1 =>
-//            Observation("symbolic def with multi args",
-//                        name.pos.start.line,
-//                        name)
-
-//        }
-        Nil
-    }
+      }
     Observation.markdownTable(results)
   }
 
