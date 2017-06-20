@@ -17,7 +17,7 @@ object Experiment {
                         name.pos.start.line + 1,
                         s"infix call site with ${args.length} args")
           case Defn.Def(_, name, _, Seq(params), _, _)
-              if !name.value.forall(_.isLetterOrDigit) &&
+              if !name.value.headOption.exists(x => x.isLetter || x == '_') &&
                 params.length > 1 =>
             Observation(name.value,
                         name.pos.start.line + 1,
