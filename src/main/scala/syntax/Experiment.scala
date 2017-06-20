@@ -20,11 +20,11 @@ object Experiment {
             Observation(name.value,
                         name.pos.start.line + 1,
                         s"infix call site with ${args.length} args")
-          case Defn.Def(_, name, _, Seq(params), _, _)
-              if isSymbolic(name) && params.length > 1 =>
-            Observation(name.value,
-                        name.pos.start.line + 1,
-                        s"symbolic def with ${params.length} args")
+//          case Defn.Def(_, name, _, Seq(params), _, _)
+//              if isSymbolic(name) && params.length > 1 =>
+//            Observation(name.value,
+//                        name.pos.start.line + 1,
+//                        s"symbolic def with ${params.length} args")
         }
       }
     Observation.markdownTable(results)
