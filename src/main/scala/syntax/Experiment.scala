@@ -7,18 +7,21 @@ import testkit._
 
 object Experiment {
 
+  def isSymbolic(name: Term.Name): Boolean =
+    !name.value.headOption.exists(x => x.isLetter || x == '_')
+
   def symbolicInfix(corpus: Corpus): String = {
     val files = Corpus.files(corpus).toBuffer.par
     val results =
       SyntaxAnalysis.onParsed[Observation[String]](files) { source =>
         source.collect {
-          case Term.ApplyInfix(_, name, _, args) if args.length > 1 =>
+          case Term.ApplyInfix(_, name, _, args)
+              if isSymbolic(name) && args.length > 1 =>
             Observation(name.value,
                         name.pos.start.line + 1,
                         s"infix call site with ${args.length} args")
           case Defn.Def(_, name, _, Seq(params), _, _)
-              if !name.value.headOption.exists(x => x.isLetter || x == '_') &&
-                params.length > 1 =>
+              if isSymbolic(name) && params.length > 1 =>
             Observation(name.value,
                         name.pos.start.line + 1,
                         s"symbolic def with ${params.length} args")
