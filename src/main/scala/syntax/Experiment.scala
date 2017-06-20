@@ -8,20 +8,20 @@ import testkit._
 object Experiment {
 
   def symbolicInfix(corpus: Corpus): String = {
-    val files = Corpus.files(corpus).toBuffer.par
+    val files = Corpus.files(corpus).take(1000).toBuffer.par
     val results =
-      SyntaxAnalysis.onParsed[Observation[Term.Name]](files) { source =>
+      SyntaxAnalysis.onParsed[Observation[String]](files) { source =>
         source.collect {
           case Term.ApplyInfix(_, name, _, args) if args.length > 1 =>
-            Observation("infix call site with multiple args",
-                        name.pos.start.line,
-                        name)
+            Observation(name.value,
+                        name.pos.start.line + 1,
+                        s"infix call site with ${args.length} args")
           case Defn.Def(_, name, _, Seq(params), _, _)
               if !name.value.forall(_.isLetterOrDigit) &&
                 params.length > 1 =>
-            Observation("symbolic def with multi args",
-                        name.pos.start.line,
-                        name)
+            Observation(name.value,
+                        name.pos.start.line + 1,
+                        s"symbolic def with ${params.length} args")
         }
       }
     Observation.markdownTable(results)
