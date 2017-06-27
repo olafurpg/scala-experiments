@@ -27,8 +27,25 @@ object Experiment {
     Observation.markdownTable(results)
   }
 
+  def streamFusionCandidate(corpus: Corpus): String = {
+    val files = Corpus.files(corpus).toBuffer.par
+    val results =
+      SyntaxAnalysis.onParsed[Observation[String]](files) { source =>
+        source.collect {
+          case q"$fun.flatMap($_)" =>
+            Observation(
+              fun.syntax,
+              fun.pos.start.line + 1,
+              "flatmap"
+            )
+
+        }
+      }
+    Observation.markdownTable(results)
+  }
+
   def main(args: Array[String]): Unit = {
-    val result = symbolicInfix(Corpus.fastparse)
+    val result = streamFusionCandidate(Corpus.fastparse)
     Files.write(Paths.get("target", "results.txt"), result.getBytes())
     println(result)
   }
