@@ -1,7 +1,5 @@
 package experiment
 
-import java.nio.file.Path
-import scala.collection.mutable
 import scala.meta._
 
 object DefMacroUsage {

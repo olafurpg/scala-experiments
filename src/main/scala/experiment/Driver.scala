@@ -21,7 +21,9 @@ object Driver {
   }
 
   def main(args: Array[String]): Unit = {
-    val report = DefMacroUsage()
+    val report = Acyclic()
+//    val report = WildcardTypeParam()
+//    val report = DefMacroUsage()
     printReport(report)
   }
 }

@@ -11,6 +11,8 @@ import org.langmeta.internal.semanticdb.{schema => s}
 import org.langmeta.semanticdb.ResolvedName
 
 case class SemanticCtx(database: Database) {
+  def input = database.documents.head.input
+  def tree: Source = input.parse[Source].get
   val resolvedSymbols: Map[Symbol, Denotation] = {
     val buf = Map.newBuilder[Symbol, Denotation]
     database.symbols.foreach { s =>
