@@ -1,4 +1,4 @@
-package syntax
+package experiment
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -33,7 +33,8 @@ case class SemanticCtx(tree: Tree, database: Database) {
 }
 
 object SemanticAnalysis {
-  def run[T](root: AbsolutePath)(f: SemanticCtx => T): mutable.Buffer[(Path, T)] = {
+  def run[T](root: AbsolutePath)(
+      f: SemanticCtx => T): mutable.Buffer[(Path, T)] = {
     val results = new CopyOnWriteArrayList[(Path, T)]
     def visit(path: Path): Unit =
       try {
@@ -56,7 +57,7 @@ object SemanticAnalysis {
       .asScala
       .filter { file =>
         Files.isRegularFile(file) &&
-          PathIO.extension(file) == "semanticdb"
+        PathIO.extension(file) == "semanticdb"
       }
       .toVector
       .par
