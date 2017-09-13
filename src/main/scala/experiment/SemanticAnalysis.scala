@@ -10,15 +10,15 @@ import org.langmeta.internal.io.PathIO
 import org.langmeta.internal.semanticdb.{schema => s}
 import org.langmeta.semanticdb.ResolvedName
 
-case class SemanticCtx(tree: Tree, database: Database) {
-  private val _denots: Map[Symbol, Denotation] = {
+case class SemanticCtx(database: Database) {
+  val resolvedSymbols: Map[Symbol, Denotation] = {
     val buf = Map.newBuilder[Symbol, Denotation]
     database.symbols.foreach { s =>
       buf += (s.symbol -> s.denotation)
     }
     buf.result()
   }
-  private val _symbols: Map[Position, ResolvedName] = {
+  val resolvedNames: Map[Position, ResolvedName] = {
     val buf = Map.newBuilder[Position, ResolvedName]
     def visit(names: Seq[ResolvedName]) = names.foreach { name =>
       buf += (name.position -> name)
@@ -28,20 +28,23 @@ case class SemanticCtx(tree: Tree, database: Database) {
     database.symbols.foreach(s => visit(s.denotation.names))
     buf.result()
   }
-  def denotation(symbol: Symbol): Option[Denotation] = _denots.get(symbol)
-  def symbol(pos: Position): Option[Symbol] = _symbols.get(pos).map(_.symbol)
+  def denotation(symbol: Symbol): Option[Denotation] =
+    resolvedSymbols.get(symbol)
+  def symbol(pos: Position): Option[Symbol] =
+    resolvedNames.get(pos).map(_.symbol)
 }
 
 object SemanticAnalysis {
-  def run[T](root: AbsolutePath)(
-      f: SemanticCtx => T): mutable.Buffer[(Path, T)] = {
+  val rootPath = "target/semanticdb.v11"
+  val root = AbsolutePath(rootPath)
+
+  def run[T](f: SemanticCtx => T): mutable.Buffer[(Path, T)] = {
     val results = new CopyOnWriteArrayList[(Path, T)]
     def visit(path: Path): Unit =
       try {
         val sdb = s.Database.parseFrom(Files.readAllBytes(path))
         val mdb = sdb.toDb(None)
-        val tree = mdb.documents.head.input.parse[Source].get
-        val ctx = SemanticCtx(tree, mdb)
+        val ctx = SemanticCtx(mdb)
         results.add(path -> f(ctx))
         print(".")
       } catch {
