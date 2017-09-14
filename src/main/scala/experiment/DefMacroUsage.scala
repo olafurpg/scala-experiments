@@ -19,10 +19,15 @@ object DefMacroUsage {
         case _ => Config.Unknown
       }
       for {
-        (_, name) <- ctx.resolvedNames
+        name <- ctx.database.names
+        if !name.isDefinition
         denot <- ctx.denotation(name.symbol)
-        if denot.isMacro
-      } yield MacroCall(name.symbol, config)
+        if denot.name == "unapply"
+        if denot.isCase
+      } yield {
+        Predef.println(ctx.input.syntax)
+        MacroCall(name.symbol, config)
+      }
     }
 
     val sb = new StringBuilder

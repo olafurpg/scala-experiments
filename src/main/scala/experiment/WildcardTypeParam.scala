@@ -13,7 +13,10 @@ object WildcardTypeParam {
         override def apply(tree: Tree): Unit = tree match {
           case Type.Param(_, name, _, _, _, _) =>
             name match {
-              case Name.Anonymous() =>
+              case Name.Anonymous() if tree.parent.exists {
+                    case _: Defn.Class | _: Defn.Trait => true
+                    case _ => false
+                  } =>
                 results = Observation("", name.pos.startLine, ()) :: results
               case _ =>
             }
