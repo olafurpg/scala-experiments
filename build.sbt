@@ -1,7 +1,20 @@
-name := "syntax-experiments"
+inThisBuild(
+  List(
+    organization := "com.geirsson",
+    scalaVersion := "2.12.3"
+  )
+)
 
-scalaVersion := "2.12.3"
+lazy val benchmarks = project
+  .enablePlugins(JmhPlugin)
+  .dependsOn(experiments)
 
-libraryDependencies += "org.scalameta" %% "testkit" % "2.0.0-M3"
-
-scalacOptions += "-Yno-adapted-args"
+lazy val experiments = project
+  .settings(
+    libraryDependencies += "org.scalameta" %% "testkit" % "2.0.0-M3",
+    buildInfoPackage := "experiment",
+    buildInfoKeys := Seq[BuildInfoKey](
+      "cwd" -> baseDirectory.in(ThisBuild).value
+    )
+  )
+  .enablePlugins(BuildInfoPlugin)
