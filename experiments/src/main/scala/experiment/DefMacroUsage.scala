@@ -1,5 +1,6 @@
 package experiment
 
+import java.util.concurrent.atomic.AtomicInteger
 import scala.meta._
 
 object DefMacroUsage {
@@ -12,24 +13,16 @@ object DefMacroUsage {
   case class MacroCall(symbol: String, config: Config)
   def apply(): String = {
     val results = SemanticAnalysis.run { ctx =>
-      val path = ctx.sdatabase.documents.head.filename
-      val config: Config =
-        if (path.contains("/test/")) Config.Test
-        else Config.Main
       for {
         document <- ctx.sdatabase.documents
+        config = {
+          if (document.filename.contains("/test/")) Config.Test
+          else Config.Main
+        }
         name <- document.names
         if !name.isDefinition
         denot <- ctx.denotation(name.symbol)
-        // aa = (
-        //   else ()
-        // )
-        if {
-          if (denot.name == "reify") {
-            Predef.println("target/semanticdb.v11/" + document.filename)
-          }
-          denot.isMacro
-        }
+        if denot.isMacro
       } yield MacroCall(name.symbol, config)
     }
 
@@ -48,7 +41,7 @@ object DefMacroUsage {
           println("```")
           calls
             .groupBy(_.symbol)
-            .mapValues(_.length)
+            .mapValues(_.size)
             .toSeq
             .sortBy(-_._2)
             .foreach {

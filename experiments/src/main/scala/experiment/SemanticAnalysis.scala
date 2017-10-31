@@ -1,14 +1,20 @@
 package experiment
 
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import scala.collection.mutable
+import scala.collection.parallel.mutable.ParArray
 import scala.meta._
 import scala.util.control.NonFatal
 import org.langmeta.internal.io.PathIO
 import org.langmeta.internal.semanticdb.{schema => s}
 import org.langmeta.semanticdb.ResolvedName
+import org.scalameta.logger
 
 case class SemanticCtx(sdatabase: s.Database) {
   def document = database.documents.head
@@ -46,10 +52,25 @@ case class SemanticCtx(sdatabase: s.Database) {
 object SemanticAnalysis {
   var parallel = false
   val root =
-    AbsolutePath(BuildInfo.cwd).resolve("target").resolve("semanticdb.v11")
+    AbsolutePath(BuildInfo.cwd).resolve("target").resolve("v12")
 
-  def run[T](f: SemanticCtx => T): mutable.Buffer[(Path, T)] = {
-    val results = new CopyOnWriteArrayList[(Path, T)]
+  def run[T](f: SemanticCtx => T): Iterable[(Path, T)] = {
+    import scala.collection.JavaConverters._
+    val paths = ParArray.newBuilder[Path]
+    Files.walkFileTree(
+      root.toNIO,
+      new SimpleFileVisitor[Path] {
+        override def visitFile(
+            file: Path,
+            attrs: BasicFileAttributes): FileVisitResult = {
+          if (PathIO.extension(file) == "semanticdb") {
+            paths += file
+          }
+          FileVisitResult.CONTINUE
+        }
+      }
+    )
+    val results = new ConcurrentLinkedQueue[(Path, T)]
     def visit(path: Path): Unit =
       try {
         val sdb = s.Database.parseFrom(Files.readAllBytes(path))
@@ -62,21 +83,7 @@ object SemanticAnalysis {
           e.setStackTrace(st.take(20))
           e.printStackTrace()
       }
-    import scala.collection.JavaConverters._
-    val files = Files
-      .walk(root.toNIO)
-      .iterator()
-      .asScala
-      .filter { file =>
-        Files.isRegularFile(file) &&
-        PathIO.extension(file) == "semanticdb"
-      }
-      .toVector
-    val genFiles =
-      if (parallel) files.par
-      else files
-    genFiles.foreach(visit)
+    paths.result().foreach(visit)
     results.asScala
   }
-
 }
