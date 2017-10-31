@@ -10,31 +10,37 @@ import org.langmeta.internal.io.PathIO
 import org.langmeta.internal.semanticdb.{schema => s}
 import org.langmeta.semanticdb.ResolvedName
 
-case class SemanticCtx(database: s.Database) {
+case class SemanticCtx(sdatabase: s.Database) {
   def document = database.documents.head
-  // def input = document.head.input
-  // def tree: Source = input.parse[Source].get
-  // val resolvedSymbols: Map[Symbol, Denotation] = {
-  //   val buf = Map.newBuilder[Symbol, Denotation]
-  //   database.symbols.foreach { s =>
-  //     buf += (s.symbol -> s.denotation)
-  //   }
-  //   buf.result()
-  // }
-  // val resolvedNames: Map[Position, ResolvedName] = {
-  //   val buf = Map.newBuilder[Position, ResolvedName]
-  //   def visit(names: Seq[ResolvedName]) = names.foreach { name =>
-  //     buf += (name.position -> name)
-  //   }
-  //   visit(database.names)
-  //   database.synthetics.foreach(s => visit(s.names))
-  //   database.symbols.foreach(s => visit(s.denotation.names))
-  //   buf.result()
-  // }
-  // def denotation(symbol: Symbol): Option[Denotation] =
-  //   resolvedSymbols.get(symbol)
-  // def symbol(pos: Position): Option[Symbol] =
-  //   resolvedNames.get(pos).map(_.symbol)
+  def input = document.input
+  def tree: Source = input.parse[Source].get
+  lazy val database = sdatabase.toDb(None)
+  lazy val resolvedSymbols: Map[String, Denotation] = {
+    val buf = Map.newBuilder[String, Denotation]
+    for {
+      document <- sdatabase.documents
+      s.ResolvedSymbol(symbol, Some(s.Denotation(flags, name, signature, _))) <- document.symbols
+    } {
+      buf += (symbol -> Denotation(flags, name, signature, Nil))
+    }
+    buf.result()
+  }
+  lazy val resolvedNames: Map[Position, ResolvedName] = {
+    val buf = Map.newBuilder[Position, ResolvedName]
+    def visit(names: Seq[ResolvedName]) = names.foreach { name =>
+      buf += (name.position -> name)
+    }
+    visit(database.names)
+    database.synthetics.foreach(s => visit(s.names))
+    database.symbols.foreach(s => visit(s.denotation.names))
+    buf.result()
+  }
+  def denotation(symbol: String): Option[Denotation] =
+    resolvedSymbols.get(symbol)
+  def denotation(symbol: Symbol): Option[Denotation] =
+    denotation(symbol.syntax)
+  def symbol(pos: Position): Option[Symbol] =
+    resolvedNames.get(pos).map(_.symbol)
 }
 
 object SemanticAnalysis {
@@ -47,15 +53,14 @@ object SemanticAnalysis {
     def visit(path: Path): Unit =
       try {
         val sdb = s.Database.parseFrom(Files.readAllBytes(path))
-        // val mdb = sdb.toDb(None)
         val ctx = SemanticCtx(sdb)
         results.add(path -> f(ctx))
-//        print(".")
+        print(".")
       } catch {
         case NonFatal(e) =>
-//          val st = e.getStackTrace
-//          e.setStackTrace(st.take(10))
-//          e.printStackTrace()
+          val st = e.getStackTrace
+          e.setStackTrace(st.take(20))
+          e.printStackTrace()
       }
     import scala.collection.JavaConverters._
     val files = Files
@@ -67,7 +72,7 @@ object SemanticAnalysis {
         PathIO.extension(file) == "semanticdb"
       }
       .toVector
-    val genFiles = 
+    val genFiles =
       if (parallel) files.par
       else files
     genFiles.foreach(visit)
