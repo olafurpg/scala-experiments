@@ -23,7 +23,8 @@ object Driver {
   def main(args: Array[String]): Unit = {
 //    val report = Acyclic()
 //    val report = WildcardTypeParam()
-    val report = DefMacroUsage()
+//val report = DefMacroUsage()
+    val report = ImplicitsUsage()
     printReport(report)
   }
 }
