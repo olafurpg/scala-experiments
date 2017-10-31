@@ -20,11 +20,15 @@ object Driver {
     }
   }
 
+  val `Hello world!` = 2
+  val a = 3
+
   def main(args: Array[String]): Unit = {
 //    val report = Acyclic()
 //    val report = WildcardTypeParam()
 //val report = DefMacroUsage()
-    val report = ImplicitsUsage()
+    val report = UniversalTrait()
+//    val report = ImplicitsUsage()
     printReport(report)
   }
 }
