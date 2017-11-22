@@ -4,6 +4,7 @@ import java.util
 import java.util.Comparator
 import java.util.concurrent.atomic.AtomicInteger
 import scala.meta._
+import org.langmeta.internal.semanticdb.schema
 import scala.meta.testkit.SyntaxAnalysis
 import scala.util.Sorting
 
@@ -17,13 +18,21 @@ object DefMacroUsage {
   case class MacroCall(symbol: String, config: Config)
   def apply(): String = {
     val results = SemanticAnalysis.run { ctx =>
+      def allNames(
+          document: schema.Document): Traversable[schema.ResolvedName] =
+        new Traversable[schema.ResolvedName] {
+          override def foreach[U](f: schema.ResolvedName => U): Unit = {
+            document.names.foreach(f)
+            document.synthetics.foreach(_.names.foreach(f))
+          }
+        }
       for {
         document <- ctx.sdatabase.documents
         config = {
           if (document.filename.contains("/test/")) Config.Test
           else Config.Main
         }
-        name <- document.names
+        name <- allNames(document)
         if !name.isDefinition
         denot <- ctx.denotation(name.symbol)
         if denot.isMacro
