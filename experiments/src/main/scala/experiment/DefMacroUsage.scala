@@ -4,6 +4,7 @@ import java.util
 import java.util.Comparator
 import java.util.concurrent.atomic.AtomicInteger
 import scala.meta._
+import scala.meta.testkit.SyntaxAnalysis
 import scala.util.Sorting
 
 object DefMacroUsage {
