@@ -7,7 +7,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.parallel.mutable.ParArray
 import scala.meta._
 import scala.meta.testkit.CorpusFile
@@ -105,12 +107,24 @@ object SemanticAnalysis {
       }
     }
     val results = new ConcurrentLinkedQueue[(SourceFile, T)]
+    val analyzedFilenames = new ConcurrentHashMap[(String, String), Unit]()
+    val totalLines = new ConcurrentHashMap[String, AtomicInteger]()
     def visit(file: SourceFile): Unit =
       try {
         val path = file.path
-        val sdb = s.Database.parseFrom(Files.readAllBytes(path))
-        val ctx = SemanticCtx(sdb, file)
-        results.add(file.copy(filename = sdb.documents.head.filename) -> f(ctx))
+        s.Database.parseFrom(Files.readAllBytes(path)).documents.foreach { d =>
+          val sdb = s.Database(d :: Nil)
+          analyzedFilenames.computeIfAbsent(
+            file.url -> d.filename, { _ =>
+              val counter =
+                totalLines.computeIfAbsent(file.url, _ => new AtomicInteger())
+              counter.addAndGet(d.contents.count(_ == '\n'))
+              val ctx = SemanticCtx(sdb, file)
+              results.add(
+                file.copy(filename = sdb.documents.head.filename) -> f(ctx))
+            }
+          )
+        }
         print(".")
       } catch {
         case NonFatal(e) =>
@@ -122,6 +136,13 @@ object SemanticAnalysis {
       .result()
 //      .take(1000)
       .foreach(visit)
+    println()
+    totalLines.asScala.foreach {
+      case (url, counter) =>
+        println(f"$counter\t$url")
+    }
+    val totalCount = totalLines.values().asScala.iterator.map(_.get()).sum
+    println("TOTAL LINES: " + totalCount)
     results.asScala
   }
 }
